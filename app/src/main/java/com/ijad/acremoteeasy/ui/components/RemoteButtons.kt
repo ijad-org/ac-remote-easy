@@ -1,5 +1,16 @@
 package com.ijad.acremoteeasy.ui.components
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.scale
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.border
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -384,7 +396,7 @@ fun RemoteHandsetBody(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
     ) {
         Column(
@@ -397,27 +409,99 @@ fun RemoteHandsetBody(
     }
 }
 
+/**
+ * Distinct Power hero control: soft squircle (not a flat Mi-style circle),
+ * teal primary, outer ring, and a short scale pulse when pressed/sent.
+ */
+@Composable
+fun PowerHeroButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    poweredOn: Boolean = true,
+    size: Dp = 128.dp,
+    icon: ImageVector,
+    pulseKey: Int = 0
+) {
+    val scope = rememberCoroutineScope()
+    val scale = remember { Animatable(1f) }
+    LaunchedEffect(pulseKey) {
+        if (pulseKey <= 0) return@LaunchedEffect
+        scale.snapTo(1f)
+        scale.animateTo(0.88f, animationSpec = tween(70))
+        scale.animateTo(1.06f, animationSpec = tween(110))
+        scale.animateTo(1f, animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+    }
+    val shape = RoundedCornerShape(36.dp)
+    val fill = if (poweredOn) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val content = if (poweredOn) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val ring = MaterialTheme.colorScheme.primary.copy(alpha = if (poweredOn) 0.28f else 0.12f)
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .scale(scale.value)
+            .shadow(elevation = 10.dp, shape = shape, clip = false)
+            .border(width = 3.dp, color = ring, shape = shape)
+            .clip(shape)
+            .background(fill)
+            .semantics { contentDescription = "Power" },
+        contentAlignment = Alignment.Center
+    ) {
+        Button(
+            onClick = {
+                scope.launch {
+                    scale.snapTo(1f)
+                    scale.animateTo(0.9f, tween(60))
+                    scale.animateTo(1f, spring(stiffness = Spring.StiffnessMedium))
+                }
+                onClick()
+            },
+            enabled = enabled,
+            modifier = Modifier.fillMaxSize(),
+            shape = shape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Transparent,
+                contentColor = content,
+                disabledContainerColor = Color.Transparent,
+                disabledContentColor = content.copy(alpha = 0.5f)
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, disabledElevation = 0.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(icon, contentDescription = null, modifier = Modifier.size(size * 0.36f))
+                Spacer(Modifier.height(4.dp))
+                Text("Power", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
 @Composable
 fun PowerRemoteButton(
     poweredOn: Boolean,
     onClick: () -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
-    icon: ImageVector
+    icon: ImageVector,
+    pulseKey: Int = 0
 ) {
-    val onColor = Danger
-    val offColor = MaterialTheme.colorScheme.surfaceVariant
-    val onContent = Color.White
-    val offContent = MaterialTheme.colorScheme.onSurfaceVariant
-    RoundRemoteButton(
-        label = "Power",
-        icon = icon,
+    PowerHeroButton(
         onClick = onClick,
         enabled = enabled,
-        size = 104.dp,
-        primary = true,
-        containerColor = if (poweredOn) onColor else offColor,
-        contentColor = if (poweredOn) onContent else offContent,
+        poweredOn = poweredOn,
+        size = 112.dp,
+        icon = icon,
+        pulseKey = pulseKey,
         modifier = modifier
     )
 }

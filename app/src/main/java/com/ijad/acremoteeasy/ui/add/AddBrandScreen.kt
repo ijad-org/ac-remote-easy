@@ -81,6 +81,7 @@ import com.ijad.acremoteeasy.ir.IrTransmitter
 import com.ijad.acremoteeasy.ir.LgIrCodec
 import com.ijad.acremoteeasy.ui.components.HintCard
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
+import com.ijad.acremoteeasy.ui.components.PowerHeroButton
 import com.ijad.acremoteeasy.ui.components.SoftCard
 import kotlinx.coroutines.launch
 
@@ -103,6 +104,7 @@ fun AddBrandScreen(
     var deviceName by remember { mutableStateOf("") }
     var testedOk by remember { mutableStateOf(false) }
     var testsTried by remember { mutableIntStateOf(0) }
+    var powerPulse by remember { mutableIntStateOf(0) }
     var showRespondPrompt by remember { mutableStateOf(false) }
     var configIndex by remember { mutableIntStateOf(0) }
     var addHomeShortcut by remember { mutableStateOf(false) }
@@ -121,6 +123,7 @@ fun AddBrandScreen(
         configIndex = 0
         testedOk = false
         testsTried = 0
+        powerPulse = 0
         showRespondPrompt = false
         step = AddStep.TestPower
     }
@@ -130,6 +133,7 @@ fun AddBrandScreen(
         if (!irTransmitter.hasIrEmitter) {
             // Still reveal Yes/No so pairing can proceed on emulators / no-IR phones
             testsTried++
+            powerPulse++
             showRespondPrompt = true
             scope.launch { snackbar.showSnackbar("No IR blaster on this device") }
             return
@@ -151,6 +155,7 @@ fun AddBrandScreen(
         }
         val result = irTransmitter.transmit(frequencyHz, pattern)
         testsTried++
+        powerPulse++
         showRespondPrompt = true
         scope.launch {
             snackbar.showSnackbar(if (result.success) "Sent Power" else result.message)
@@ -317,26 +322,14 @@ fun AddBrandScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (configCount > 1) Spacer(Modifier.width(56.dp))
-                            Button(
+                            PowerHeroButton(
                                 onClick = { sendPowerProbe() },
                                 enabled = true,
-                                modifier = Modifier
-                                    .size(128.dp)
-                                    .semantics { contentDescription = "Power" },
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(),
-                                elevation = ButtonDefaults.buttonElevation(
-                                    defaultElevation = 4.dp,
-                                    pressedElevation = 1.dp
-                                ),
-                                contentPadding = PaddingValues(0.dp)
-                            ) {
-                                Icon(
-                                    Icons.Outlined.PowerSettingsNew,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp)
-                                )
-                            }
+                                poweredOn = true,
+                                size = 132.dp,
+                                icon = Icons.Outlined.PowerSettingsNew,
+                                pulseKey = powerPulse
+                            )
                             if (configCount > 1) {
                                 Spacer(Modifier.width(12.dp))
                                 IconButton(
@@ -356,13 +349,7 @@ fun AddBrandScreen(
                             }
                         }
 
-                        Text(
-                            "Power",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-
-                        Spacer(Modifier.height(40.dp))
+                        Spacer(Modifier.height(48.dp))
 
                         if (showRespondPrompt) {
                             Surface(
@@ -536,7 +523,7 @@ private fun BrandSelectCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
         Column(
             modifier = Modifier

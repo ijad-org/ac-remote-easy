@@ -8,32 +8,38 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 private val DarkColors = darkColorScheme(
-    primary = Sky,
-    onPrimary = Ink,
-    secondary = SkyDeep,
+    primary = Teal,
+    onPrimary = Color.White,
+    secondary = IndigoSoft,
     onSecondary = Color.White,
-    background = Ink,
-    onBackground = Color(0xFFF8FAFC),
-    surface = InkSoft,
+    tertiary = TealDeep,
+    background = Color(0xFF111827),
+    onBackground = Color(0xFFF1F5F9),
+    surface = Color(0xFF1F2937),
     onSurface = Color(0xFFF8FAFC),
-    surfaceVariant = Color(0xFF243044),
+    surfaceVariant = Color(0xFF334155),
     onSurfaceVariant = Color(0xFFCBD5E1),
     outline = Color(0xFF475569),
     error = Danger
 )
 
 private val LightColors = lightColorScheme(
-    primary = SkyDeep,
+    primary = TealDeep,
     onPrimary = Color.White,
-    secondary = Sky,
-    onSecondary = Ink,
+    secondary = IndigoSoft,
+    onSecondary = Color.White,
+    tertiary = Teal,
     background = Mist,
     onBackground = Ink,
     surface = MistCard,
     onSurface = Ink,
-    surfaceVariant = Color(0xFFE8EEF6),
+    surfaceVariant = Color(0xFFE2E8F0),
     onSurfaceVariant = Slate,
     outline = Color(0xFFCBD5E1),
+    primaryContainer = Color(0xFFCCFBF1),
+    onPrimaryContainer = TealDeep,
+    secondaryContainer = Color(0xFFE0E7FF),
+    onSecondaryContainer = Color(0xFF312E81),
     error = Danger
 )
 

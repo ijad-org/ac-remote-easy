@@ -76,6 +76,7 @@ fun RemoteScreen(
     var mode by remember { mutableStateOf(AcMode.Cool) }
     var fan by remember { mutableStateOf(FanSpeed.Auto) }
     var poweredOn by remember { mutableStateOf(true) }
+    var powerPulse by remember { mutableIntStateOf(0) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val canSend = irTransmitter.hasIrEmitter && brand != null
@@ -107,6 +108,7 @@ fun RemoteScreen(
             pattern = cmd.pattern
         }
         val result = irTransmitter.transmit(frequencyHz, pattern)
+        if (key == "power") powerPulse++
         scope.launch {
             snackbar.showSnackbar(if (result.success) feedbackLabel else result.message)
         }
@@ -200,7 +202,8 @@ fun RemoteScreen(
                         send("power", if (poweredOn) "Power On" else "Power Off")
                     },
                     enabled = canSend,
-                    icon = Icons.Outlined.PowerSettingsNew
+                    icon = Icons.Outlined.PowerSettingsNew,
+                    pulseKey = powerPulse
                 )
 
                 Text(
