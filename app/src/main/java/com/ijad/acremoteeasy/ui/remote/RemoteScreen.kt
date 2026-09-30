@@ -17,9 +17,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.SwapVert
-import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,7 +36,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ijad.acremoteeasy.data.AcMode
@@ -48,8 +48,11 @@ import com.ijad.acremoteeasy.data.FanSpeed
 import com.ijad.acremoteeasy.ir.IrTransmitter
 import com.ijad.acremoteeasy.ui.components.HintCard
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
+import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
+import com.ijad.acremoteeasy.ui.components.PillRemoteButton
+import com.ijad.acremoteeasy.ui.components.PowerRemoteButton
+import com.ijad.acremoteeasy.ui.components.RemoteHandsetBody
 import com.ijad.acremoteeasy.ui.components.RoundRemoteButton
-import com.ijad.acremoteeasy.ui.components.SoftCard
 import com.ijad.acremoteeasy.ui.components.TempControlRow
 import com.ijad.acremoteeasy.ui.components.WideRemoteButton
 import kotlinx.coroutines.launch
@@ -63,6 +66,7 @@ fun RemoteScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val devices by repository.devices.collectAsStateWithLifecycle(initialValue = emptyList())
     val device = devices.firstOrNull { it.id == deviceId }
     val brand = remember(device?.brandId) {
@@ -71,6 +75,7 @@ fun RemoteScreen(
     var temperature by remember { mutableIntStateOf(24) }
     var mode by remember { mutableStateOf(AcMode.Cool) }
     var fan by remember { mutableStateOf(FanSpeed.Auto) }
+    var poweredOn by remember { mutableStateOf(true) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val canSend = irTransmitter.hasIrEmitter && brand != null
@@ -82,6 +87,7 @@ fun RemoteScreen(
             scope.launch { snackbar.showSnackbar("No pattern for $key in this pack") }
             return
         }
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         val result = irTransmitter.transmit(pack.frequencyHz, cmd.pattern)
         scope.launch {
             snackbar.showSnackbar(if (result.success) feedbackLabel else result.message)
@@ -152,37 +158,39 @@ fun RemoteScreen(
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (!irTransmitter.hasIrEmitter) {
                 IrUnavailableBanner()
             }
 
-            SoftCard {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    RoundRemoteButton(
-                        label = "Power",
-                        icon = Icons.Outlined.PowerSettingsNew,
-                        onClick = { send("power", "Power") },
-                        enabled = canSend,
-                        size = 96.dp,
-                        primary = true
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (device.verified) "Tested pack" else "Untested pack",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            RemoteHandsetBody {
+                LcdStatusStrip(
+                    brandName = device.brandName,
+                    deviceName = device.name,
+                    poweredOn = poweredOn,
+                    modeLabel = mode.label.uppercase(),
+                    temperature = temperature,
+                    fanLabel = fan.label.uppercase()
+                )
 
-            SoftCard {
-                Text("Temperature", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(12.dp))
+                PowerRemoteButton(
+                    poweredOn = poweredOn,
+                    onClick = {
+                        poweredOn = !poweredOn
+                        send("power", if (poweredOn) "Power On" else "Power Off")
+                    },
+                    enabled = canSend,
+                    icon = Icons.Outlined.PowerSettingsNew
+                )
+
+                Text(
+                    if (device.verified) "Tested pack" else "Untested pack",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 TempControlRow(
                     temperature = temperature,
                     onDown = {
@@ -195,83 +203,63 @@ fun RemoteScreen(
                     },
                     enabled = canSend
                 )
-            }
 
-            SoftCard {
-                Text("Mode", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    AcMode.entries.forEach { m ->
-                        AssistChip(
-                            onClick = {
-                                mode = m
-                                send("mode", "Mode ${m.label}")
-                            },
-                            enabled = canSend,
-                            label = { Text(m.label) },
-                            leadingIcon = {
-                                Icon(
-                                    when (m) {
-                                        AcMode.Cool -> Icons.Outlined.Thermostat
-                                        AcMode.Fan -> Icons.Outlined.Air
-                                        else -> Icons.Outlined.Tune
-                                    },
-                                    contentDescription = null
-                                )
-                            }
-                        )
-                    }
+                    PillRemoteButton(
+                        label = "Mode",
+                        subtitle = mode.label,
+                        icon = Icons.Outlined.Tune,
+                        onClick = {
+                            val next = AcMode.entries[(mode.ordinal + 1) % AcMode.entries.size]
+                            mode = next
+                            send("mode", "Mode ${next.label}")
+                        },
+                        enabled = canSend,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PillRemoteButton(
+                        label = "Fan",
+                        subtitle = fan.label,
+                        icon = Icons.Outlined.Air,
+                        onClick = {
+                            val next = FanSpeed.entries[(fan.ordinal + 1) % FanSpeed.entries.size]
+                            fan = next
+                            send("fan", "Fan ${next.label}")
+                        },
+                        enabled = canSend,
+                        modifier = Modifier.weight(1f)
+                    )
+                    PillRemoteButton(
+                        label = "Swing",
+                        icon = Icons.Outlined.SwapVert,
+                        onClick = { send("swing", "Swing") },
+                        enabled = canSend,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
-                Spacer(Modifier.height(16.dp))
-                Text("Fan", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FanSpeed.entries.forEach { f ->
-                        AssistChip(
-                            onClick = {
-                                fan = f
-                                send("fan", "Fan ${f.label}")
-                            },
-                            enabled = canSend,
-                            label = { Text(f.label) }
-                        )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                WideRemoteButton(
-                    label = "Swing",
-                    icon = Icons.Outlined.SwapVert,
-                    onClick = { send("swing", "Swing") },
-                    enabled = canSend
-                )
-            }
 
-            SoftCard {
-                Text("Test codes", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "If buttons don’t respond, try alternate sample patterns for this brand.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    listOf("test_1", "test_2", "test_3").forEachIndexed { index, key ->
-                        RoundRemoteButton(
-                            label = "T${index + 1}",
-                            onClick = { send(key, "Test ${index + 1}") },
-                            enabled = canSend,
-                            size = 72.dp
-                        )
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "Test codes",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        listOf("test_1", "test_2", "test_3").forEachIndexed { index, key ->
+                            RoundRemoteButton(
+                                label = "T${index + 1}",
+                                onClick = { send(key, "Test ${index + 1}") },
+                                enabled = canSend,
+                                size = 64.dp
+                            )
+                        }
                     }
                 }
             }
