@@ -46,6 +46,7 @@ import com.ijad.acremoteeasy.data.AppRepository
 import com.ijad.acremoteeasy.data.BrandPackLoader
 import com.ijad.acremoteeasy.data.FanSpeed
 import com.ijad.acremoteeasy.ir.IrTransmitter
+import com.ijad.acremoteeasy.ir.LgIrCodec
 import com.ijad.acremoteeasy.ui.components.HintCard
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
 import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
@@ -81,13 +82,31 @@ fun RemoteScreen(
 
     fun send(key: String, feedbackLabel: String = key) {
         val pack = brand ?: return
-        val cmd = pack.commands[key]
-        if (cmd == null) {
-            scope.launch { snackbar.showSnackbar("No pattern for $key in this pack") }
-            return
-        }
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-        val result = irTransmitter.transmit(pack.frequencyHz, cmd.pattern)
+        val frequencyHz: Int
+        val pattern: IntArray
+        if (pack.id == "lg") {
+            // State-aware classic LG 28-bit frames (see LgIrCodec).
+            frequencyHz = LgIrCodec.FREQUENCY_HZ
+            pattern = when (key) {
+                "swing" -> LgIrCodec.swingPattern()
+                "power" -> LgIrCodec.patternFor(poweredOn, mode, temperature, fan)
+                else -> {
+                    // Temp/mode/fan commands are on-state frames on LG.
+                    if (!poweredOn) poweredOn = true
+                    LgIrCodec.patternFor(true, mode, temperature, fan)
+                }
+            }
+        } else {
+            val cmd = pack.commands[key]
+            if (cmd == null) {
+                scope.launch { snackbar.showSnackbar("No pattern for $key in this pack") }
+                return
+            }
+            frequencyHz = pack.frequencyHz
+            pattern = cmd.pattern
+        }
+        val result = irTransmitter.transmit(frequencyHz, pattern)
         scope.launch {
             snackbar.showSnackbar(if (result.success) feedbackLabel else result.message)
         }

@@ -28,7 +28,7 @@ Point your phone, pick a brand pack, and probe with normal remote buttons (power
 
 JSON packs live under `app/src/main/assets/brands/`. They contain **minimal sample patterns** (NEC-like placeholder timings) so the app structure, loader, and normal-button probe flow work end-to-end.
 
-**These codes are not verified against real remotes.** Expand each pack with measured captures (or a trusted database) before relying on daily use. See the `protocolNote` field in each JSON file.
+**LG** uses documented classic 28-bit frames (IRremoteESP8266 / ha-lg-ac-infrared); the Remote screen encodes power/temp/mode/fan/swing from live UI state via `LgIrCodec`. Other brand packs remain **placeholder** sample timings — expand with measured captures before relying on daily use. See each JSON `protocolNote`.
 
 ## Features
 
