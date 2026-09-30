@@ -17,9 +17,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Air
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SwapVert
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -45,20 +49,30 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import com.ijad.acremoteeasy.data.AcMode
 import com.ijad.acremoteeasy.data.AppRepository
 import com.ijad.acremoteeasy.data.BrandPack
 import com.ijad.acremoteeasy.data.BrandPackLoader
+import com.ijad.acremoteeasy.data.FanSpeed
 import com.ijad.acremoteeasy.ir.IrTransmitter
+import com.ijad.acremoteeasy.ir.LgIrCodec
 import com.ijad.acremoteeasy.ui.components.HintCard
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
+import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
+import com.ijad.acremoteeasy.ui.components.PillRemoteButton
+import com.ijad.acremoteeasy.ui.components.PowerRemoteButton
+import com.ijad.acremoteeasy.ui.components.RemoteHandsetBody
 import com.ijad.acremoteeasy.ui.components.SoftCard
-import com.ijad.acremoteeasy.ui.components.WideRemoteButton
+import com.ijad.acremoteeasy.ui.components.TempControlRow
 import kotlinx.coroutines.launch
 
 private enum class AddStep { PickBrand, NameDevice, TestCodes, DoneHint }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +83,7 @@ fun AddBrandScreen(
     onDone: (deviceId: String) -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val brands = remember { BrandPackLoader.loadAll(context) }
     var step by remember { mutableStateOf(AddStep.PickBrand) }
     var selected by remember { mutableStateOf<BrandPack?>(null) }
@@ -76,6 +91,11 @@ fun AddBrandScreen(
     var testedOk by remember { mutableStateOf(false) }
     var testsTried by remember { mutableIntStateOf(0) }
     var savedDeviceId by remember { mutableStateOf<String?>(null) }
+    // Local probe state (Mi Remote–style visual handset)
+    var poweredOn by remember { mutableStateOf(true) }
+    var temperature by remember { mutableIntStateOf(24) }
+    var mode by remember { mutableStateOf(AcMode.Cool) }
+    var fan by remember { mutableStateOf(FanSpeed.Auto) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -85,6 +105,40 @@ fun AddBrandScreen(
         AddStep.TestCodes -> 2
         AddStep.DoneHint -> 3
     }
+
+    fun transmitProbe(key: String, displayName: String) {
+        val brand = selected ?: return
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        val frequencyHz: Int
+        val pattern: IntArray
+        if (brand.id == "lg") {
+            frequencyHz = LgIrCodec.FREQUENCY_HZ
+            pattern = when (key) {
+                "swing" -> LgIrCodec.swingPattern()
+                "power" -> LgIrCodec.patternFor(poweredOn, mode, temperature, fan)
+                else -> {
+                    if (!poweredOn) poweredOn = true
+                    LgIrCodec.patternFor(true, mode, temperature, fan)
+                }
+            }
+        } else {
+            val cmd = brand.commands[key]
+            if (cmd == null) {
+                scope.launch { snackbar.showSnackbar("No pattern for $displayName in this pack") }
+                return
+            }
+            frequencyHz = brand.frequencyHz
+            pattern = cmd.pattern
+        }
+        val result = irTransmitter.transmit(frequencyHz, pattern)
+        testsTried++
+        scope.launch {
+            snackbar.showSnackbar(if (result.success) "Sent $displayName" else result.message)
+        }
+    }
+
+    fun keyAvailable(brand: BrandPack, key: String): Boolean =
+        brand.id == "lg" || brand.commands.containsKey(key)
 
     Scaffold(
         topBar = {
@@ -96,7 +150,7 @@ fun AddBrandScreen(
                             when (step) {
                                 AddStep.PickBrand -> "Step 1 · Choose brand"
                                 AddStep.NameDevice -> "Step 2 · Name your unit"
-                                AddStep.TestCodes -> "Step 3 · Test a few codes"
+                                AddStep.TestCodes -> "Step 3 · Probe with remote"
                                 AddStep.DoneHint -> "Almost done"
                             },
                             style = MaterialTheme.typography.bodyMedium,
@@ -166,7 +220,11 @@ fun AddBrandScreen(
                                     Column(Modifier.weight(1f)) {
                                         Text(brand.name, style = MaterialTheme.typography.titleMedium)
                                         Text(
-                                            "${brand.commands.size} sample commands · placeholder IR",
+                                            if (brand.id == "lg") {
+                                                "Classic 28-bit LG IR · GE6711 / 6711A20***"
+                                            } else {
+                                                "${brand.commands.size} sample commands · placeholder IR"
+                                            },
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -225,30 +283,100 @@ fun AddBrandScreen(
                         LaunchedEffect(Unit) { step = AddStep.PickBrand }
                         return@Column
                     }
+                    val canSend = irTransmitter.hasIrEmitter
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         HintCard(
-                            "Point your phone at the AC and try the normal remote buttons " +
-                                "(Power, Temp, Mode, Fan, Swing). Mark “It worked” when the unit reacts."
+                            "Point your phone at the AC and tap buttons on the remote below " +
+                                "(Power, Temp Up/Down, Mode, Fan, Swing). Mark “It worked” when the unit reacts."
                         )
                         Spacer(Modifier.height(16.dp))
-                        listOf("power", "temp_up", "temp_down", "mode", "fan", "swing").forEach { key ->
-                            val cmd = brand.commands[key] ?: return@forEach
-                            WideRemoteButton(
-                                label = "Send ${cmd.label}",
-                                onClick = {
-                                    val result = irTransmitter.transmit(brand.frequencyHz, cmd.pattern)
-                                    testsTried++
-                                    scope.launch {
-                                        snackbar.showSnackbar(
-                                            if (result.success) "Sent ${cmd.label}" else result.message
-                                        )
-                                    }
-                                },
-                                enabled = irTransmitter.hasIrEmitter,
-                                modifier = Modifier.padding(bottom = 10.dp)
+
+                        RemoteHandsetBody {
+                            LcdStatusStrip(
+                                brandName = brand.name,
+                                deviceName = deviceName.ifBlank { "${brand.name} AC" },
+                                poweredOn = poweredOn,
+                                modeLabel = mode.label.uppercase(),
+                                temperature = temperature,
+                                fanLabel = fan.label.uppercase()
                             )
+
+                            if (keyAvailable(brand, "power")) {
+                                PowerRemoteButton(
+                                    poweredOn = poweredOn,
+                                    onClick = {
+                                        poweredOn = !poweredOn
+                                        transmitProbe("power", "Power")
+                                    },
+                                    enabled = canSend,
+                                    icon = Icons.Outlined.PowerSettingsNew
+                                )
+                            }
+
+                            if (keyAvailable(brand, "temp_up") || keyAvailable(brand, "temp_down")) {
+                                TempControlRow(
+                                    temperature = temperature,
+                                    onDown = {
+                                        temperature = (temperature - 1).coerceIn(16, 30)
+                                        transmitProbe("temp_down", "Temp Down")
+                                    },
+                                    onUp = {
+                                        temperature = (temperature + 1).coerceIn(16, 30)
+                                        transmitProbe("temp_up", "Temp Up")
+                                    },
+                                    enabled = canSend &&
+                                        keyAvailable(brand, "temp_up") &&
+                                        keyAvailable(brand, "temp_down")
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                if (keyAvailable(brand, "mode")) {
+                                    PillRemoteButton(
+                                        label = "Mode",
+                                        subtitle = mode.label,
+                                        icon = Icons.Outlined.Tune,
+                                        onClick = {
+                                            mode = AcMode.entries[
+                                                (mode.ordinal + 1) % AcMode.entries.size
+                                            ]
+                                            transmitProbe("mode", "Mode")
+                                        },
+                                        enabled = canSend,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (keyAvailable(brand, "fan")) {
+                                    PillRemoteButton(
+                                        label = "Fan",
+                                        subtitle = fan.label,
+                                        icon = Icons.Outlined.Air,
+                                        onClick = {
+                                            fan = FanSpeed.entries[
+                                                (fan.ordinal + 1) % FanSpeed.entries.size
+                                            ]
+                                            transmitProbe("fan", "Fan")
+                                        },
+                                        enabled = canSend,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                if (keyAvailable(brand, "swing")) {
+                                    PillRemoteButton(
+                                        label = "Swing",
+                                        icon = Icons.Outlined.SwapVert,
+                                        onClick = { transmitProbe("swing", "Swing") },
+                                        enabled = canSend,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
                         }
-                        Spacer(Modifier.height(8.dp))
+
+                        Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(
                                 selected = testedOk,
@@ -269,8 +397,13 @@ fun AddBrandScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Icon(Icons.Outlined.School, null, tint = MaterialTheme.colorScheme.primary)
                                 Text(
-                                    "IR learn mode is coming soon. For now, keep the closest brand pack " +
-                                        "and refine codes later from assets/brands.",
+                                    if (brand.id == "lg") {
+                                        "LG uses documented classic 28-bit frames (GE6711AR2853M / " +
+                                            "6711A20***). LG2 remotes (AKB74*) may need another pack."
+                                    } else {
+                                        "IR learn mode is coming soon. For now, keep the closest brand pack " +
+                                            "and refine codes later from assets/brands."
+                                    },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -329,7 +462,7 @@ fun AddBrandScreen(
                         Spacer(Modifier.height(8.dp))
                         Text(
                             if (testedOk) "You’re ready to use the remote."
-                            else "You can keep testing codes from the remote screen.",
+                            else "You can keep probing from the remote screen.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -338,8 +471,13 @@ fun AddBrandScreen(
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Icon(Icons.Outlined.Lightbulb, null, tint = MaterialTheme.colorScheme.primary)
                                 Text(
-                                    "Placeholder IR packs may not match your exact model. " +
-                                        "Capture real codes before depending on daily use.",
+                                    if (selected?.id == "lg") {
+                                        "LG frames are documented open-source codes; model fit still varies. " +
+                                            "Confirm with your unit before daily use."
+                                    } else {
+                                        "Placeholder IR packs may not match your exact model. " +
+                                            "Capture real codes before depending on daily use."
+                                    },
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             }

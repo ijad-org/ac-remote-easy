@@ -52,7 +52,8 @@ fun RoundRemoteButton(
     size: Dp = 76.dp,
     primary: Boolean = false,
     containerColor: Color? = null,
-    contentColor: Color? = null
+    contentColor: Color? = null,
+    accessibilityLabel: String? = null
 ) {
     val colors = when {
         containerColor != null -> ButtonDefaults.buttonColors(
@@ -83,9 +84,10 @@ fun RoundRemoteButton(
             )
         }
     }
+    val a11y = accessibilityLabel ?: label
     val buttonModifier = modifier
         .size(size.coerceAtLeast(48.dp))
-        .semantics { contentDescription = label }
+        .semantics { contentDescription = a11y }
 
     if (primary || containerColor != null) {
         Button(
@@ -237,7 +239,8 @@ fun TempControlRow(
             size = 88.dp,
             primary = true,
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            accessibilityLabel = "Temp Down"
         )
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
@@ -261,7 +264,8 @@ fun TempControlRow(
             size = 88.dp,
             primary = true,
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            accessibilityLabel = "Temp Up"
         )
     }
 }
