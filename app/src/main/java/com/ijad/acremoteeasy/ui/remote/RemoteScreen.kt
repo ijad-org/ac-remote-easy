@@ -1,14 +1,19 @@
 package com.ijad.acremoteeasy.ui.remote
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -18,15 +23,13 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -47,7 +50,6 @@ import com.ijad.acremoteeasy.data.BrandPackLoader
 import com.ijad.acremoteeasy.data.FanSpeed
 import com.ijad.acremoteeasy.ir.IrTransmitter
 import com.ijad.acremoteeasy.ir.LgIrCodec
-import com.ijad.acremoteeasy.ui.components.HintCard
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
 import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
 import com.ijad.acremoteeasy.ui.components.PillRemoteButton
@@ -57,7 +59,6 @@ import com.ijad.acremoteeasy.ui.components.TempControlRow
 import com.ijad.acremoteeasy.ui.components.WideRemoteButton
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RemoteScreen(
     deviceId: String,
@@ -87,13 +88,11 @@ fun RemoteScreen(
         val frequencyHz: Int
         val pattern: IntArray
         if (pack.id == "lg") {
-            // State-aware classic LG 28-bit frames (see LgIrCodec).
             frequencyHz = LgIrCodec.FREQUENCY_HZ
             pattern = when (key) {
                 "swing" -> LgIrCodec.swingPattern()
                 "power" -> LgIrCodec.patternFor(poweredOn, mode, temperature, fan)
                 else -> {
-                    // Temp/mode/fan commands are on-state frames on LG.
                     if (!poweredOn) poweredOn = true
                     LgIrCodec.patternFor(true, mode, temperature, fan)
                 }
@@ -114,53 +113,16 @@ fun RemoteScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(device?.name ?: "Remote")
-                        Text(
-                            device?.brandName ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (device != null && brand != null) {
-                        IconButton(onClick = {
-                            scope.launch {
-                                repository.addFavorite(device, "power", "Power")
-                                snackbar.showSnackbar("Added Power to favorites")
-                            }
-                        }) {
-                            Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite power")
-                        }
-                        IconButton(onClick = {
-                            scope.launch {
-                                repository.removeDevice(device.id)
-                                onBack()
-                            }
-                        }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Remove device")
-                        }
-                    }
-                }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbar) }
-    ) { padding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         if (device == null || brand == null) {
             Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .statusBarsPadding()
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -169,15 +131,18 @@ fun RemoteScreen(
                 Spacer(Modifier.height(12.dp))
                 WideRemoteButton(label = "Go back", onClick = onBack)
             }
-            return@Scaffold
+            return
         }
 
+        // Full-screen remote content (no TopAppBar / no bottom nav chrome)
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .statusBarsPadding()
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp)
+                .padding(top = 56.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -185,7 +150,7 @@ fun RemoteScreen(
                 IrUnavailableBanner()
             }
 
-            RemoteHandsetBody {
+            RemoteHandsetBody(modifier = Modifier.fillMaxWidth()) {
                 LcdStatusStrip(
                     brandName = device.brandName,
                     deviceName = device.name,
@@ -204,12 +169,6 @@ fun RemoteScreen(
                     enabled = canSend,
                     icon = Icons.Outlined.PowerSettingsNew,
                     pulseKey = powerPulse
-                )
-
-                Text(
-                    if (device.verified) "Tested pack" else "Untested pack",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 TempControlRow(
@@ -261,19 +220,62 @@ fun RemoteScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
-
             }
 
-            HintCard(
-                "Optional IR learn: capture your original remote later. " +
-                    "v1 ships placeholder timings under assets/brands — expand with measured codes."
-            )
+            // Soft footer copy — not a chrome bar
             Text(
                 "Not affiliated with ${device.brandName} or other AC brands.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 24.dp)
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
         }
+
+        // Floating overlays (not mini app bars)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
+            }
+            Row {
+                Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            repository.addFavorite(device, "power", "Power")
+                            snackbar.showSnackbar("Added Power to favorites")
+                        }
+                    }) {
+                        Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite power")
+                    }
+                }
+                Spacer(Modifier.padding(4.dp))
+                Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            repository.removeDevice(device.id)
+                            onBack()
+                        }
+                    }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove device")
+                    }
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(16.dp)
+        )
     }
 }

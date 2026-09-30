@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -204,6 +206,182 @@ fun AddBrandScreen(
         AddStep.SaveDevice -> 2
     }
 
+    // Immersive Power-test: no top/bottom chrome — full-screen remote + bottom prompts
+    if (step == AddStep.TestPower) {
+        val brand = selected
+        if (brand == null) {
+            LaunchedEffect(Unit) { step = AddStep.SelectAc }
+            return
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            // Full-screen remote hero
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 56.dp, bottom = 200.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    brand.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (configCount > 1) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Configuration ${configIndex + 1}/$configCount",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(Modifier.height(28.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (configCount > 1) Spacer(Modifier.width(56.dp))
+                    PowerHeroButton(
+                        onClick = { sendPowerProbe() },
+                        enabled = true,
+                        poweredOn = true,
+                        size = 148.dp,
+                        icon = Icons.Outlined.PowerSettingsNew,
+                        pulseKey = powerPulse
+                    )
+                    if (configCount > 1) {
+                        Spacer(Modifier.width(12.dp))
+                        IconButton(
+                            onClick = { advanceConfig() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .semantics { contentDescription = "Next configuration" }
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowForward,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Floating back (not a mini top bar)
+            Surface(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .align(Alignment.TopStart),
+                shape = CircleShape,
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp
+            ) {
+                IconButton(onClick = { step = AddStep.SelectAc }) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
+            }
+
+            // Bottom dialogue / prompts — never next to Power
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (!showRespondPrompt) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 1.dp,
+                        shadowElevation = 4.dp
+                    ) {
+                        Text(
+                            "Point the remote at the device and tap Power.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 2.dp,
+                        shadowElevation = 6.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "Does the device respond?",
+                                style = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { showRespondPrompt = false },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text("No") }
+                                Button(
+                                    onClick = {
+                                        testedOk = true
+                                        step = AddStep.SaveDevice
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(52.dp),
+                                    shape = RoundedCornerShape(14.dp)
+                                ) { Text("Yes") }
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        testedOk = false
+                        step = AddStep.SaveDevice
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                ) { Text("Skip testing & save") }
+            }
+
+            SnackbarHost(
+                hostState = snackbar,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 56.dp)
+            )
+        }
+        return
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -285,130 +463,7 @@ fun AddBrandScreen(
                     }
                 }
 
-                AddStep.TestPower -> {
-                    val brand = selected
-                    if (brand == null) {
-                        LaunchedEffect(Unit) { step = AddStep.SelectAc }
-                        return@Column
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "Point the remote at the device and tap Power.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                        if (configCount > 1) {
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                "Configuration ${configIndex + 1}/$configCount",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-
-                        Spacer(Modifier.height(40.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            if (configCount > 1) Spacer(Modifier.width(56.dp))
-                            PowerHeroButton(
-                                onClick = { sendPowerProbe() },
-                                enabled = true,
-                                poweredOn = true,
-                                size = 132.dp,
-                                icon = Icons.Outlined.PowerSettingsNew,
-                                pulseKey = powerPulse
-                            )
-                            if (configCount > 1) {
-                                Spacer(Modifier.width(12.dp))
-                                IconButton(
-                                    onClick = { advanceConfig() },
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                        .semantics { contentDescription = "Next configuration" }
-                                ) {
-                                    Icon(
-                                        Icons.AutoMirrored.Outlined.ArrowForward,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(Modifier.height(48.dp))
-
-                        if (showRespondPrompt) {
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                tonalElevation = 2.dp,
-                                shadowElevation = 4.dp
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(20.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        "Does the device respond?",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Spacer(Modifier.height(16.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                    ) {
-                                        FilledTonalButton(
-                                            onClick = {
-                                                // Stay on Power test; hide prompt so user can tap Power again.
-                                                showRespondPrompt = false
-                                            },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(52.dp),
-                                            shape = RoundedCornerShape(14.dp)
-                                        ) { Text("No") }
-                                        Button(
-                                            onClick = {
-                                                testedOk = true
-                                                step = AddStep.SaveDevice
-                                            },
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .height(52.dp),
-                                            shape = RoundedCornerShape(14.dp)
-                                        ) { Text("Yes") }
-                                    }
-                                }
-                            }
-                        }
-
-                        TextButton(
-                            onClick = {
-                                testedOk = false
-                                step = AddStep.SaveDevice
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 12.dp, bottom = 16.dp)
-                        ) { Text("Skip testing & save") }
-                    }
-                }
+                AddStep.TestPower -> { /* immersive branch above */ }
 
                 AddStep.SaveDevice -> {
                     val brand = selected
