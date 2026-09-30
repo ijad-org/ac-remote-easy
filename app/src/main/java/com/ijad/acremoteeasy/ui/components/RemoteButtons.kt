@@ -505,3 +505,63 @@ fun PowerRemoteButton(
         modifier = modifier
     )
 }
+
+
+/** Light elevated grid cell for full-screen remote layout (ref structure, our teal look). */
+@Composable
+fun GridRemoteCell(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    emphasize: Boolean = false,
+    subtitle: String? = null
+) {
+    val bg = if (emphasize) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val fg = if (emphasize) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier
+            .heightIn(min = 72.dp)
+            .semantics {
+                contentDescription = if (subtitle != null) "$label, $subtitle" else label
+            },
+        shape = RoundedCornerShape(18.dp),
+        color = bg,
+        tonalElevation = 1.dp,
+        shadowElevation = 3.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = if (emphasize) MaterialTheme.colorScheme.primary else fg, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.height(6.dp))
+            }
+            Text(label, style = MaterialTheme.typography.titleMedium, color = fg, textAlign = TextAlign.Center)
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}

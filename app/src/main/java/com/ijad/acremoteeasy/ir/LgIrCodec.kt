@@ -19,6 +19,7 @@ object LgIrCodec {
     private const val SIGNATURE = 0x88
     private const val OFF_FRAME = 0x88C0051
     private const val SWING_V_SWING = 0x8813149
+    private const val SWING_H_AUTO = 0x881316B
     private const val TEMP_OFFSET = 15
 
     private const val HDR_MARK = 8500
@@ -39,6 +40,8 @@ object LgIrCodec {
     }
 
     fun swingPattern(): IntArray = frameToPattern(SWING_V_SWING)
+
+    fun swingHorizontalPattern(): IntArray = frameToPattern(SWING_H_AUTO)
 
     /**
      * Light set of Power probe frames for pairing (Mi-style config cycle).

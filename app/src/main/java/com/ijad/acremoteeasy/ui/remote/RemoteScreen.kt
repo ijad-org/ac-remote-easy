@@ -11,18 +11,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PowerSettingsNew
+import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.SwapVert
-import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Timer
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +36,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -42,7 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ijad.acremoteeasy.data.AcMode
 import com.ijad.acremoteeasy.data.AppRepository
@@ -50,12 +60,10 @@ import com.ijad.acremoteeasy.data.BrandPackLoader
 import com.ijad.acremoteeasy.data.FanSpeed
 import com.ijad.acremoteeasy.ir.IrTransmitter
 import com.ijad.acremoteeasy.ir.LgIrCodec
+import com.ijad.acremoteeasy.ui.components.GridRemoteCell
 import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
 import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
-import com.ijad.acremoteeasy.ui.components.PillRemoteButton
-import com.ijad.acremoteeasy.ui.components.PowerRemoteButton
-import com.ijad.acremoteeasy.ui.components.RemoteHandsetBody
-import com.ijad.acremoteeasy.ui.components.TempControlRow
+import com.ijad.acremoteeasy.ui.components.PowerHeroButton
 import com.ijad.acremoteeasy.ui.components.WideRemoteButton
 import kotlinx.coroutines.launch
 
@@ -78,6 +86,7 @@ fun RemoteScreen(
     var fan by remember { mutableStateOf(FanSpeed.Auto) }
     var poweredOn by remember { mutableStateOf(true) }
     var powerPulse by remember { mutableIntStateOf(0) }
+    var moreOpen by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val canSend = irTransmitter.hasIrEmitter && brand != null
@@ -91,6 +100,7 @@ fun RemoteScreen(
             frequencyHz = LgIrCodec.FREQUENCY_HZ
             pattern = when (key) {
                 "swing" -> LgIrCodec.swingPattern()
+                "direction" -> LgIrCodec.swingHorizontalPattern()
                 "power" -> LgIrCodec.patternFor(poweredOn, mode, temperature, fan)
                 else -> {
                     if (!poweredOn) poweredOn = true
@@ -98,9 +108,14 @@ fun RemoteScreen(
                 }
             }
         } else {
-            val cmd = pack.commands[key]
+            val mapped = when (key) {
+                "direction" -> "swing"
+                "speed" -> "fan"
+                else -> key
+            }
+            val cmd = pack.commands[mapped] ?: pack.commands[key]
             if (cmd == null) {
-                scope.launch { snackbar.showSnackbar("No pattern for $key in this pack") }
+                scope.launch { snackbar.showSnackbar("No pattern for $feedbackLabel in this pack") }
                 return
             }
             frequencyHz = pack.frequencyHz
@@ -134,139 +149,231 @@ fun RemoteScreen(
             return
         }
 
-        // Full-screen remote content (no TopAppBar / no bottom nav chrome)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp)
-                .padding(top = 56.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 14.dp)
+                .padding(top = 52.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (!irTransmitter.hasIrEmitter) {
                 IrUnavailableBanner()
             }
 
-            RemoteHandsetBody(modifier = Modifier.fillMaxWidth()) {
-                LcdStatusStrip(
-                    brandName = device.brandName,
-                    deviceName = device.name,
-                    poweredOn = poweredOn,
-                    modeLabel = mode.label.uppercase(),
-                    temperature = temperature,
-                    fanLabel = fan.label.uppercase()
-                )
+            // Upper status / display
+            LcdStatusStrip(
+                brandName = device.brandName,
+                deviceName = device.name,
+                poweredOn = poweredOn,
+                modeLabel = mode.label.uppercase(),
+                temperature = temperature,
+                fanLabel = fan.label.uppercase()
+            )
 
-                PowerRemoteButton(
-                    poweredOn = poweredOn,
+            // Row 1: Power | Mode
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    PowerHeroButton(
+                        onClick = {
+                            poweredOn = !poweredOn
+                            send("power", if (poweredOn) "Power On" else "Power Off")
+                        },
+                        enabled = canSend,
+                        poweredOn = poweredOn,
+                        size = 96.dp,
+                        icon = Icons.Outlined.PowerSettingsNew,
+                        pulseKey = powerPulse
+                    )
+                }
+                GridRemoteCell(
+                    label = "Mode",
+                    subtitle = mode.label,
                     onClick = {
-                        poweredOn = !poweredOn
-                        send("power", if (poweredOn) "Power On" else "Power Off")
+                        val next = AcMode.entries[(mode.ordinal + 1) % AcMode.entries.size]
+                        mode = next
+                        send("mode", "Mode ${next.label}")
                     },
                     enabled = canSend,
-                    icon = Icons.Outlined.PowerSettingsNew,
-                    pulseKey = powerPulse
+                    modifier = Modifier.weight(1f).height(96.dp)
                 )
+            }
 
-                TempControlRow(
-                    temperature = temperature,
-                    onDown = {
-                        temperature = (temperature - 1).coerceIn(16, 30)
-                        send("temp_down", "Temp $temperature°")
+            // Row 2: Speed | Direction | Swing
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GridRemoteCell(
+                    label = "Speed",
+                    subtitle = fan.label,
+                    onClick = {
+                        val next = FanSpeed.entries[(fan.ordinal + 1) % FanSpeed.entries.size]
+                        fan = next
+                        send("speed", "Fan ${next.label}")
                     },
-                    onUp = {
-                        temperature = (temperature + 1).coerceIn(16, 30)
-                        send("temp_up", "Temp $temperature°")
-                    },
-                    enabled = canSend
+                    enabled = canSend,
+                    modifier = Modifier.weight(1f)
                 )
+                GridRemoteCell(
+                    label = "Direction",
+                    icon = Icons.Outlined.SwapHoriz,
+                    onClick = { send("direction", "Direction") },
+                    enabled = canSend,
+                    modifier = Modifier.weight(1f)
+                )
+                GridRemoteCell(
+                    label = "Swing",
+                    icon = Icons.Outlined.SwapVert,
+                    onClick = { send("swing", "Swing") },
+                    enabled = canSend,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
+            // Row 3: − Temp +
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp,
+                shadowElevation = 3.dp
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    PillRemoteButton(
-                        label = "Mode",
-                        subtitle = mode.label,
-                        icon = Icons.Outlined.Tune,
+                    TextButton(
                         onClick = {
-                            val next = AcMode.entries[(mode.ordinal + 1) % AcMode.entries.size]
-                            mode = next
-                            send("mode", "Mode ${next.label}")
+                            temperature = (temperature - 1).coerceIn(16, 30)
+                            send("temp_down", "Temp $temperature°")
                         },
                         enabled = canSend,
-                        modifier = Modifier.weight(1f)
-                    )
-                    PillRemoteButton(
-                        label = "Fan",
-                        subtitle = fan.label,
-                        icon = Icons.Outlined.Air,
+                        modifier = Modifier.size(64.dp)
+                    ) {
+                        Text("−", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "$temperature°",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Temp",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    TextButton(
                         onClick = {
-                            val next = FanSpeed.entries[(fan.ordinal + 1) % FanSpeed.entries.size]
-                            fan = next
-                            send("fan", "Fan ${next.label}")
+                            temperature = (temperature + 1).coerceIn(16, 30)
+                            send("temp_up", "Temp $temperature°")
                         },
                         enabled = canSend,
-                        modifier = Modifier.weight(1f)
-                    )
-                    PillRemoteButton(
-                        label = "Swing",
-                        icon = Icons.Outlined.SwapVert,
-                        onClick = { send("swing", "Swing") },
-                        enabled = canSend,
-                        modifier = Modifier.weight(1f)
-                    )
+                        modifier = Modifier.size(64.dp)
+                    ) {
+                        Text("+", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 
-            // Soft footer copy — not a chrome bar
+            // Row 4: Timer | Sleep | more
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                GridRemoteCell(
+                    label = "Timer",
+                    icon = Icons.Outlined.Timer,
+                    onClick = {
+                        scope.launch {
+                            snackbar.showSnackbar("Timers: open the Timers tab from Home")
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                GridRemoteCell(
+                    label = "Sleep",
+                    icon = Icons.Outlined.Bedtime,
+                    onClick = {
+                        scope.launch {
+                            snackbar.showSnackbar("Sleep IR not in this pack yet")
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Box(modifier = Modifier.weight(1f)) {
+                    GridRemoteCell(
+                        label = "More",
+                        icon = Icons.Outlined.MoreHoriz,
+                        onClick = { moreOpen = true },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Add Power to favorites") },
+                            onClick = {
+                                moreOpen = false
+                                scope.launch {
+                                    repository.addFavorite(device, "power", "Power")
+                                    snackbar.showSnackbar("Added Power to favorites")
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.FavoriteBorder, contentDescription = null)
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Remove device") },
+                            onClick = {
+                                moreOpen = false
+                                scope.launch {
+                                    repository.removeDevice(device.id)
+                                    onBack()
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Delete, contentDescription = null)
+                            }
+                        )
+                    }
+                }
+            }
+
             Text(
                 "Not affiliated with ${device.brandName} or other AC brands.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
             )
         }
 
-        // Floating overlays (not mini app bars)
-        Row(
+        // Edge back only — no mini top bar
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(10.dp)
+                .align(Alignment.TopStart),
+            shape = CircleShape,
+            tonalElevation = 2.dp,
+            shadowElevation = 2.dp
         ) {
-            Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                }
-            }
-            Row {
-                Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
-                    IconButton(onClick = {
-                        scope.launch {
-                            repository.addFavorite(device, "power", "Power")
-                            snackbar.showSnackbar("Added Power to favorites")
-                        }
-                    }) {
-                        Icon(Icons.Outlined.FavoriteBorder, contentDescription = "Favorite power")
-                    }
-                }
-                Spacer(Modifier.padding(4.dp))
-                Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
-                    IconButton(onClick = {
-                        scope.launch {
-                            repository.removeDevice(device.id)
-                            onBack()
-                        }
-                    }) {
-                        Icon(Icons.Outlined.Delete, contentDescription = "Remove device")
-                    }
-                }
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
             }
         }
 
