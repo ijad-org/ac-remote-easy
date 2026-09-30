@@ -482,11 +482,7 @@ fun PowerHeroButton(
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, pressedElevation = 0.dp, disabledElevation = 0.dp),
             contentPadding = PaddingValues(0.dp)
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(icon, contentDescription = null, modifier = Modifier.size(size * 0.36f))
-                Spacer(Modifier.height(4.dp))
-                Text("Power", style = MaterialTheme.typography.labelLarge)
-            }
+            Icon(icon, contentDescription = null, modifier = Modifier.size(size * 0.42f))
         }
     }
 }

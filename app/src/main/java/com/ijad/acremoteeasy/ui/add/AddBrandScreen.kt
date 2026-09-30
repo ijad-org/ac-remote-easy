@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PowerSettingsNew
@@ -189,6 +190,18 @@ fun AddBrandScreen(
         }
     }
 
+    fun saveAndOpenRemote(verified: Boolean) {
+        val brand = selected ?: return
+        scope.launch {
+            val device = repository.addDevice(
+                name = deviceName.ifBlank { "${brand.name} AC" },
+                brand = brand,
+                verified = verified
+            )
+            onDone(device.id)
+        }
+    }
+
     fun requestHomeShortcut(deviceId: String, name: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             scope.launch { snackbar.showSnackbar("Home shortcuts need Android 8+") }
@@ -219,7 +232,7 @@ fun AddBrandScreen(
         AddStep.SaveDevice -> 2
     }
 
-    // Immersive Power-test: hint above Power; Yes/No below after tap
+    // Immersive Power-test: hint above Power; Yes/No at bottom; tick saves
     if (step == AddStep.TestPower) {
         val brand = selected
         if (brand == null) {
@@ -237,7 +250,7 @@ fun AddBrandScreen(
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 56.dp, bottom = 16.dp),
+                    .padding(top = 56.dp, bottom = if (showRespondPrompt) 200.dp else 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -256,7 +269,6 @@ fun AddBrandScreen(
                 }
                 Spacer(Modifier.height(20.dp))
 
-                // Main hint always sits ABOVE the Power button
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
@@ -280,19 +292,23 @@ fun AddBrandScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (configCount > 1) {
-                        IconButton(
-                            onClick = { retreatConfig() },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                                .semantics { contentDescription = "Previous configuration" }
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Outlined.ArrowBack,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        if (configIndex > 0) {
+                            IconButton(
+                                onClick = { retreatConfig() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .semantics { contentDescription = "Previous configuration" }
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Outlined.ArrowBack,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            Spacer(Modifier.size(48.dp))
                         }
                         Spacer(Modifier.width(12.dp))
                     }
@@ -322,64 +338,9 @@ fun AddBrandScreen(
                         }
                     }
                 }
-
-                // Yes/No appears only after Power tap — below Power, not replacing top hint position
-                if (showRespondPrompt) {
-                    Spacer(Modifier.height(28.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 2.dp,
-                        shadowElevation = 6.dp
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(20.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "Does the device respond?",
-                                style = MaterialTheme.typography.titleLarge,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                FilledTonalButton(
-                                    onClick = { advanceConfig() },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(52.dp),
-                                    shape = RoundedCornerShape(14.dp)
-                                ) { Text("No") }
-                                Button(
-                                    onClick = {
-                                        testedOk = true
-                                        step = AddStep.SaveDevice
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(52.dp),
-                                    shape = RoundedCornerShape(14.dp)
-                                ) { Text("Yes") }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-                TextButton(
-                    onClick = {
-                        testedOk = false
-                        step = AddStep.SaveDevice
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Skip testing & save") }
             }
 
-            // Floating back (not a mini top bar)
+            // Floating back (top-start)
             Surface(
                 modifier = Modifier
                     .statusBarsPadding()
@@ -391,6 +352,78 @@ fun AddBrandScreen(
             ) {
                 IconButton(onClick = { step = AddStep.SelectAc }) {
                     Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
+            }
+
+            // Tick at top-end: save & open remote (verified if Yes already set testedOk)
+            Surface(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .align(Alignment.TopEnd),
+                shape = CircleShape,
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                IconButton(
+                    onClick = { saveAndOpenRemote(verified = testedOk) },
+                    modifier = Modifier.semantics { contentDescription = "Save and open remote" }
+                ) {
+                    Icon(
+                        Icons.Outlined.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            // Yes/No at bottom after Power tap
+            if (showRespondPrompt) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 2.dp,
+                    shadowElevation = 6.dp
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Does the device respond?",
+                            style = MaterialTheme.typography.titleLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = { advanceConfig() },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(14.dp)
+                            ) { Text("No") }
+                            Button(
+                                onClick = {
+                                    testedOk = true
+                                    saveAndOpenRemote(verified = true)
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(14.dp)
+                            ) { Text("Yes") }
+                        }
+                    }
                 }
             }
 
@@ -611,8 +644,8 @@ private fun BrandSelectCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            BrandLettermark(brandId = brand.id, brandName = brand.name, size = 56.dp)
-            Spacer(Modifier.height(12.dp))
+            BrandLettermark(brandId = brand.id, brandName = brand.name, size = 72.dp)
+            Spacer(Modifier.height(14.dp))
             Text(
                 brand.name,
                 style = MaterialTheme.typography.titleMedium,
