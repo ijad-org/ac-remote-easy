@@ -166,10 +166,23 @@ fun AddBrandScreen(
 
     fun advanceConfig() {
         if (configCount <= 1) {
+            showRespondPrompt = false
             scope.launch { snackbar.showSnackbar("Only one configuration for this brand") }
             return
         }
         configIndex = (configIndex + 1) % configCount
+        showRespondPrompt = false
+        scope.launch {
+            snackbar.showSnackbar("Configuration ${configIndex + 1}/$configCount")
+        }
+    }
+
+    fun retreatConfig() {
+        if (configCount <= 1) {
+            scope.launch { snackbar.showSnackbar("Only one configuration for this brand") }
+            return
+        }
+        configIndex = (configIndex - 1 + configCount) % configCount
         showRespondPrompt = false
         scope.launch {
             snackbar.showSnackbar("Configuration ${configIndex + 1}/$configCount")
@@ -206,7 +219,7 @@ fun AddBrandScreen(
         AddStep.SaveDevice -> 2
     }
 
-    // Immersive Power-test: no top/bottom chrome — full-screen remote + bottom prompts
+    // Immersive Power-test: hint above Power; Yes/No below after tap
     if (step == AddStep.TestPower) {
         val brand = selected
         if (brand == null) {
@@ -218,14 +231,13 @@ fun AddBrandScreen(
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Full-screen remote hero
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
                     .padding(horizontal = 24.dp)
-                    .padding(top = 56.dp, bottom = 200.dp),
+                    .padding(top = 56.dp, bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -242,13 +254,48 @@ fun AddBrandScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(20.dp))
+
+                // Main hint always sits ABOVE the Power button
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 4.dp
+                ) {
+                    Text(
+                        "Point the remote at AC and tap the button. Make sure AC responds.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    if (configCount > 1) Spacer(Modifier.width(56.dp))
+                    if (configCount > 1) {
+                        IconButton(
+                            onClick = { retreatConfig() },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .semantics { contentDescription = "Previous configuration" }
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                    }
                     PowerHeroButton(
                         onClick = { sendPowerProbe() },
                         enabled = true,
@@ -275,49 +322,10 @@ fun AddBrandScreen(
                         }
                     }
                 }
-            }
 
-            // Floating back (not a mini top bar)
-            Surface(
-                modifier = Modifier
-                    .statusBarsPadding()
-                    .padding(12.dp)
-                    .align(Alignment.TopStart),
-                shape = CircleShape,
-                tonalElevation = 2.dp,
-                shadowElevation = 2.dp
-            ) {
-                IconButton(onClick = { step = AddStep.SelectAc }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                }
-            }
-
-            // Bottom dialogue / prompts — never next to Power
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (!showRespondPrompt) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 1.dp,
-                        shadowElevation = 4.dp
-                    ) {
-                        Text(
-                            "Point the remote at the device and tap Power.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)
-                        )
-                    }
-                } else {
+                // Yes/No appears only after Power tap — below Power, not replacing top hint position
+                if (showRespondPrompt) {
+                    Spacer(Modifier.height(28.dp))
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -340,7 +348,7 @@ fun AddBrandScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 FilledTonalButton(
-                                    onClick = { showRespondPrompt = false },
+                                    onClick = { advanceConfig() },
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(52.dp),
@@ -360,15 +368,30 @@ fun AddBrandScreen(
                         }
                     }
                 }
+
+                Spacer(Modifier.height(12.dp))
                 TextButton(
                     onClick = {
                         testedOk = false
                         step = AddStep.SaveDevice
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) { Text("Skip testing & save") }
+            }
+
+            // Floating back (not a mini top bar)
+            Surface(
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .align(Alignment.TopStart),
+                shape = CircleShape,
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp
+            ) {
+                IconButton(onClick = { step = AddStep.SelectAc }) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
             }
 
             SnackbarHost(
@@ -381,6 +404,7 @@ fun AddBrandScreen(
         }
         return
     }
+
 
     Scaffold(
         topBar = {
