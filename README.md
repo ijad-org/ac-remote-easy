@@ -2,7 +2,7 @@
 
 A calm, ad-free Android IR remote for air conditioners — **Kotlin**, **Jetpack Compose**, **Material 3**.
 
-Point your phone, pick a brand pack, test a few codes, and control power / temperature / mode / fan / swing. Favorites and timer stubs round out the v1 UX.
+Point your phone, pick a brand pack, and probe with normal remote buttons (power / temperature / mode / fan / swing). Favorites and timer stubs round out the v1 UX.
 
 > **Disclaimer:** AC Remote Easy is an independent open-source project. It is **not affiliated with, endorsed by, or sponsored by** Voltas, LG, Samsung, Daikin, Haier, Panasonic, Carrier, Blue Star, or any other AC manufacturer. Brand names are used only to identify compatible device categories.
 
@@ -11,7 +11,7 @@ Point your phone, pick a brand pack, test a few codes, and control power / tempe
 | Area | v1 |
 |------|----|
 | Brands | Voltas, LG, Samsung, Daikin, Haier, Panasonic, Carrier, Blue Star |
-| Controls | Power, temp ±, mode, fan, swing, test codes |
+| Controls | Power, temp ±, mode, fan, swing |
 | Setup | Guided add flow: brand → name → test → save |
 | Storage | DataStore for devices, favorites, timer stubs |
 | IR | `ConsumerIrManager` via `IrTransmitter` + haptic on send |
@@ -26,15 +26,15 @@ Point your phone, pick a brand pack, test a few codes, and control power / tempe
 
 ### Placeholder brand packs
 
-JSON packs live under `app/src/main/assets/brands/`. They contain **minimal sample patterns** (NEC-like placeholder timings) so the app structure, loader, and test flow work end-to-end.
+JSON packs live under `app/src/main/assets/brands/`. They contain **minimal sample patterns** (NEC-like placeholder timings) so the app structure, loader, and normal-button probe flow work end-to-end.
 
 **These codes are not verified against real remotes.** Expand each pack with measured captures (or a trusted database) before relying on daily use. See the `protocolNote` field in each JSON file.
 
 ## Features
 
 - **Home** — device list, premium empty state, IR-unavailable banner, FAB to add
-- **Add brand** — stepped flow with progress, radio brand pick, naming, guided test buttons, learn-mode tip
-- **Remote** — large touch targets, power / temp / mode / fan / swing, test codes, favorite + delete
+- **Add brand** — stepped flow with progress, radio brand pick, naming, probe with normal buttons, learn-mode tip
+- **Remote** — physical-handset UI, power / temp / mode / fan / swing, favorite + delete
 - **Favorites** — one-tap send with haptics
 - **Timers** — polished stub UI (exact background alarms planned later)
 - **No ads**, MIT license

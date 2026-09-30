@@ -227,11 +227,11 @@ fun AddBrandScreen(
                     }
                     Column(Modifier.verticalScroll(rememberScrollState())) {
                         HintCard(
-                            "Point your phone at the AC. Tap Test 1, then Test 2 or 3 if needed. " +
-                                "Mark “It worked” when the unit reacts (beep, display, or fan)."
+                            "Point your phone at the AC and try the normal remote buttons " +
+                                "(Power, Temp, Mode, Fan, Swing). Mark “It worked” when the unit reacts."
                         )
                         Spacer(Modifier.height(16.dp))
-                        listOf("test_1", "test_2", "test_3", "power").forEach { key ->
+                        listOf("power", "temp_up", "temp_down", "mode", "fan", "swing").forEach { key ->
                             val cmd = brand.commands[key] ?: return@forEach
                             WideRemoteButton(
                                 label = "Send ${cmd.label}",

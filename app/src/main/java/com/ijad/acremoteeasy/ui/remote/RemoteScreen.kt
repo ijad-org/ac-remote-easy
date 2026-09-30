@@ -52,7 +52,6 @@ import com.ijad.acremoteeasy.ui.components.LcdStatusStrip
 import com.ijad.acremoteeasy.ui.components.PillRemoteButton
 import com.ijad.acremoteeasy.ui.components.PowerRemoteButton
 import com.ijad.acremoteeasy.ui.components.RemoteHandsetBody
-import com.ijad.acremoteeasy.ui.components.RoundRemoteButton
 import com.ijad.acremoteeasy.ui.components.TempControlRow
 import com.ijad.acremoteeasy.ui.components.WideRemoteButton
 import kotlinx.coroutines.launch
@@ -241,27 +240,6 @@ fun RemoteScreen(
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "Test codes",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        listOf("test_1", "test_2", "test_3").forEachIndexed { index, key ->
-                            RoundRemoteButton(
-                                label = "T${index + 1}",
-                                onClick = { send(key, "Test ${index + 1}") },
-                                enabled = canSend,
-                                size = 64.dp
-                            )
-                        }
-                    }
-                }
             }
 
             HintCard(
