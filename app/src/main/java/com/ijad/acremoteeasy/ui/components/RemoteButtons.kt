@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -291,7 +292,8 @@ fun LcdStatusStrip(
     modeLabel: String,
     temperature: Int,
     fanLabel: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    expanded: Boolean = false
 ) {
     val lcdBg = Color(0xFF0A1628)
     val lcdFg = Color(0xFF7DFFB3)
@@ -310,10 +312,13 @@ fun LcdStatusStrip(
         shadowElevation = 4.dp,
         border = BorderStroke(1.dp, Color(0xFF1E3A5F))
     ) {
+        val vPad = if (expanded) 28.dp else 12.dp
         Column(
             modifier = Modifier
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = vPad)
                 .fillMaxWidth()
+                .then(if (expanded) Modifier.fillMaxHeight() else Modifier),
+            verticalArrangement = if (expanded) Arrangement.SpaceBetween else Arrangement.Top
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -368,7 +373,7 @@ fun LcdStatusStrip(
                     text = "$temperature°C",
                     color = lcdFg,
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 28.sp,
+                    fontSize = if (expanded) 42.sp else 28.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -532,7 +537,7 @@ fun GridRemoteCell(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier
-            .heightIn(min = 72.dp)
+            .heightIn(min = 64.dp)
             .semantics {
                 contentDescription = if (subtitle != null) "$label, $subtitle" else label
             },
@@ -543,8 +548,8 @@ fun GridRemoteCell(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 14.dp),
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {

@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bedtime
@@ -154,43 +152,58 @@ fun RemoteScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp)
-                .padding(top = 52.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 12.dp)
+                .padding(top = 48.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (!irTransmitter.hasIrEmitter) {
                 IrUnavailableBanner()
             }
 
-            // Upper status / display
+            // Upper status / display (~top third)
             LcdStatusStrip(
                 brandName = device.brandName,
                 deviceName = device.name,
                 poweredOn = poweredOn,
                 modeLabel = mode.label.uppercase(),
                 temperature = temperature,
-                fanLabel = fan.label.uppercase()
+                fanLabel = fan.label.uppercase(),
+                expanded = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.34f)
             )
 
-            // Row 1: Power | Mode
+            // Row 1: Power | Mode (equal cells)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.18f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    PowerHeroButton(
-                        onClick = {
-                            poweredOn = !poweredOn
-                            send("power", if (poweredOn) "Power On" else "Power Off")
-                        },
-                        enabled = canSend,
-                        poweredOn = poweredOn,
-                        size = 96.dp,
-                        icon = Icons.Outlined.PowerSettingsNew,
-                        pulseKey = powerPulse
-                    )
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize(),
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 3.dp
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        PowerHeroButton(
+                            onClick = {
+                                poweredOn = !poweredOn
+                                send("power", if (poweredOn) "Power On" else "Power Off")
+                            },
+                            enabled = canSend,
+                            poweredOn = poweredOn,
+                            size = 88.dp,
+                            icon = Icons.Outlined.PowerSettingsNew,
+                            pulseKey = powerPulse
+                        )
+                    }
                 }
                 GridRemoteCell(
                     label = "Mode",
@@ -201,13 +214,17 @@ fun RemoteScreen(
                         send("mode", "Mode ${next.label}")
                     },
                     enabled = canSend,
-                    modifier = Modifier.weight(1f).height(96.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxSize()
                 )
             }
 
             // Row 2: Speed | Direction | Swing
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.14f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 GridRemoteCell(
@@ -219,27 +236,29 @@ fun RemoteScreen(
                         send("speed", "Fan ${next.label}")
                     },
                     enabled = canSend,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).fillMaxSize()
                 )
                 GridRemoteCell(
                     label = "Direction",
                     icon = Icons.Outlined.SwapHoriz,
                     onClick = { send("direction", "Direction") },
                     enabled = canSend,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).fillMaxSize()
                 )
                 GridRemoteCell(
                     label = "Swing",
                     icon = Icons.Outlined.SwapVert,
                     onClick = { send("swing", "Swing") },
                     enabled = canSend,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).fillMaxSize()
                 )
             }
 
             // Row 3: − Temp +
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.14f),
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 1.dp,
@@ -288,9 +307,11 @@ fun RemoteScreen(
                 }
             }
 
-            // Row 4: Timer | Sleep | more
+            // Row 4: Timer | Sleep | more (…)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(0.14f),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 GridRemoteCell(
@@ -301,7 +322,7 @@ fun RemoteScreen(
                             snackbar.showSnackbar("Timers: open the Timers tab from Home")
                         }
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).fillMaxSize()
                 )
                 GridRemoteCell(
                     label = "Sleep",
@@ -311,14 +332,14 @@ fun RemoteScreen(
                             snackbar.showSnackbar("Sleep IR not in this pack yet")
                         }
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).fillMaxSize()
                 )
-                Box(modifier = Modifier.weight(1f)) {
+                Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                     GridRemoteCell(
-                        label = "More",
+                        label = "…",
                         icon = Icons.Outlined.MoreHoriz,
                         onClick = { moreOpen = true },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxSize()
                     )
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                         DropdownMenuItem(
@@ -356,25 +377,31 @@ fun RemoteScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
+                modifier = Modifier.fillMaxWidth()
             )
         }
 
-        // Edge back only — no mini top bar
-        Surface(
+        // Edge back + light title (not a mini app bar)
+        Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(10.dp)
-                .align(Alignment.TopStart),
-            shape = CircleShape,
-            tonalElevation = 2.dp,
-            shadowElevation = 2.dp
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+            Surface(shape = CircleShape, tonalElevation = 2.dp, shadowElevation = 2.dp) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+                }
             }
+            Text(
+                "${device.brandName} AC",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(Modifier.size(48.dp)) // balance back button
         }
 
         SnackbarHost(
