@@ -6,22 +6,24 @@ import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +35,8 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PowerSettingsNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -41,7 +45,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,10 +66,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ijad.acremoteeasy.MainActivity
@@ -81,7 +84,7 @@ import com.ijad.acremoteeasy.ui.components.IrUnavailableBanner
 import com.ijad.acremoteeasy.ui.components.SoftCard
 import kotlinx.coroutines.launch
 
-/** Three-step Mi-inspired pairing: Select → Power test → Save. */
+/** Three-step pairing: Select → Power test → Save. */
 private enum class AddStep { SelectAc, TestPower, SaveDevice }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -100,6 +103,7 @@ fun AddBrandScreen(
     var deviceName by remember { mutableStateOf("") }
     var testedOk by remember { mutableStateOf(false) }
     var testsTried by remember { mutableIntStateOf(0) }
+    var showRespondPrompt by remember { mutableStateOf(false) }
     var configIndex by remember { mutableIntStateOf(0) }
     var addHomeShortcut by remember { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
@@ -111,9 +115,22 @@ fun AddBrandScreen(
         else -> 1
     }.coerceAtLeast(1)
 
+    fun openPowerTest(brand: BrandPack) {
+        selected = brand
+        deviceName = "${brand.name} AC"
+        configIndex = 0
+        testedOk = false
+        testsTried = 0
+        showRespondPrompt = false
+        step = AddStep.TestPower
+    }
+
     fun sendPowerProbe() {
         val brand = selected ?: return
         if (!irTransmitter.hasIrEmitter) {
+            // Still reveal Yes/No so pairing can proceed on emulators / no-IR phones
+            testsTried++
+            showRespondPrompt = true
             scope.launch { snackbar.showSnackbar("No IR blaster on this device") }
             return
         }
@@ -134,6 +151,7 @@ fun AddBrandScreen(
         }
         val result = irTransmitter.transmit(frequencyHz, pattern)
         testsTried++
+        showRespondPrompt = true
         scope.launch {
             snackbar.showSnackbar(if (result.success) "Sent Power" else result.message)
         }
@@ -145,6 +163,7 @@ fun AddBrandScreen(
             return
         }
         configIndex = (configIndex + 1) % configCount
+        showRespondPrompt = false
         scope.launch {
             snackbar.showSnackbar("Configuration ${configIndex + 1}/$configCount")
         }
@@ -208,7 +227,10 @@ fun AddBrandScreen(
                         when (step) {
                             AddStep.SelectAc -> onBack()
                             AddStep.TestPower -> step = AddStep.SelectAc
-                            AddStep.SaveDevice -> step = AddStep.TestPower
+                            AddStep.SaveDevice -> {
+                                showRespondPrompt = testsTried > 0
+                                step = AddStep.TestPower
+                            }
                         }
                     }) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -237,67 +259,23 @@ fun AddBrandScreen(
             when (step) {
                 AddStep.SelectAc -> {
                     Text(
-                        "Pick the brand on your AC (or remote).",
-                        style = MaterialTheme.typography.bodyLarge
+                        "Tap a brand to start the Power test.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(Modifier.height(12.dp))
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        contentPadding = PaddingValues(bottom = 24.dp)
+                    Spacer(Modifier.height(16.dp))
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(bottom = 24.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         items(brands, key = { it.id }) { brand ->
-                            SoftCard(
-                                modifier = Modifier.selectable(
-                                    selected = selected?.id == brand.id,
-                                    onClick = {
-                                        selected = brand
-                                        configIndex = 0
-                                        if (deviceName.isBlank()) deviceName = "${brand.name} AC"
-                                    },
-                                    role = Role.RadioButton
-                                )
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    RadioButton(
-                                        selected = selected?.id == brand.id,
-                                        onClick = null
-                                    )
-                                    Column(Modifier.weight(1f)) {
-                                        Text(brand.name, style = MaterialTheme.typography.titleMedium)
-                                        Text(
-                                            if (brand.id == "lg") {
-                                                "Classic 28-bit LG IR · GE6711 / 6711A20***"
-                                            } else {
-                                                "Placeholder IR · probe Power to test"
-                                            },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        item {
-                            Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick = {
-                                    selected?.let {
-                                        if (deviceName.isBlank()) deviceName = "${it.name} AC"
-                                        configIndex = 0
-                                        testedOk = false
-                                        testsTried = 0
-                                        step = AddStep.TestPower
-                                    }
-                                },
-                                enabled = selected != null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp),
-                                shape = RoundedCornerShape(16.dp)
-                            ) { Text("Continue") }
+                            BrandSelectCard(
+                                brand = brand,
+                                onClick = { openPowerTest(brand) }
+                            )
                         }
                     }
                 }
@@ -315,32 +293,33 @@ fun AddBrandScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "Point the remote at the device and tap Power.\nMake sure the AC responds.",
+                            "Point the remote at the device and tap Power.",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            "Checking available configurations ${configIndex + 1}/$configCount",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center
-                        )
+                        if (configCount > 1) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(
+                                "Configuration ${configIndex + 1}/$configCount",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                textAlign = TextAlign.Center
+                            )
+                        }
 
-                        Spacer(Modifier.height(36.dp))
+                        Spacer(Modifier.height(40.dp))
 
-                        // Power-first row: large Power + optional next-config chevron
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Spacer(Modifier.width(56.dp)) // balance chevron
+                            if (configCount > 1) Spacer(Modifier.width(56.dp))
                             Button(
                                 onClick = { sendPowerProbe() },
-                                enabled = irTransmitter.hasIrEmitter,
+                                enabled = true,
                                 modifier = Modifier
                                     .size(128.dp)
                                     .semantics { contentDescription = "Power" },
@@ -358,21 +337,22 @@ fun AddBrandScreen(
                                     modifier = Modifier.size(48.dp)
                                 )
                             }
-                            Spacer(Modifier.width(12.dp))
-                            IconButton(
-                                onClick = { advanceConfig() },
-                                enabled = configCount > 1,
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .semantics { contentDescription = "Next configuration" }
-                            ) {
-                                Icon(
-                                    Icons.AutoMirrored.Outlined.ArrowForward,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                            if (configCount > 1) {
+                                Spacer(Modifier.width(12.dp))
+                                IconButton(
+                                    onClick = { advanceConfig() },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .semantics { contentDescription = "Next configuration" }
+                                ) {
+                                    Icon(
+                                        Icons.AutoMirrored.Outlined.ArrowForward,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
@@ -382,73 +362,51 @@ fun AddBrandScreen(
                             modifier = Modifier.padding(top = 12.dp)
                         )
 
-                        Spacer(Modifier.height(48.dp))
+                        Spacer(Modifier.height(40.dp))
 
-                        // Bottom sheet–style respond card
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            tonalElevation = 2.dp,
-                            shadowElevation = 4.dp
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                        if (showRespondPrompt) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                tonalElevation = 2.dp,
+                                shadowElevation = 4.dp
                             ) {
-                                Text(
-                                    "Does the device respond?",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    textAlign = TextAlign.Center
-                                )
-                                Spacer(Modifier.height(16.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    FilledTonalButton(
-                                        onClick = {
-                                            if (configIndex + 1 < configCount) {
-                                                configIndex++
-                                                scope.launch {
-                                                    snackbar.showSnackbar(
-                                                        "Try configuration ${configIndex + 1}/$configCount"
-                                                    )
-                                                }
-                                            } else {
-                                                scope.launch {
-                                                    snackbar.showSnackbar(
-                                                        "No more configurations — try another brand or skip"
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(52.dp),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ) { Text("No") }
-                                    Button(
-                                        onClick = {
-                                            testedOk = true
-                                            step = AddStep.SaveDevice
-                                        },
-                                        enabled = testsTried > 0 || !irTransmitter.hasIrEmitter,
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(52.dp),
-                                        shape = RoundedCornerShape(14.dp)
-                                    ) { Text("Yes") }
-                                }
-                                if (testsTried == 0 && irTransmitter.hasIrEmitter) {
-                                    Spacer(Modifier.height(8.dp))
                                     Text(
-                                        "Tap Power first, then answer Yes or No.",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        fontSize = 13.sp
+                                        "Does the device respond?",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        textAlign = TextAlign.Center
                                     )
+                                    Spacer(Modifier.height(16.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        FilledTonalButton(
+                                            onClick = {
+                                                // Stay on Power test; hide prompt so user can tap Power again.
+                                                showRespondPrompt = false
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(52.dp),
+                                            shape = RoundedCornerShape(14.dp)
+                                        ) { Text("No") }
+                                        Button(
+                                            onClick = {
+                                                testedOk = true
+                                                step = AddStep.SaveDevice
+                                            },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(52.dp),
+                                            shape = RoundedCornerShape(14.dp)
+                                        ) { Text("Yes") }
+                                    }
                                 }
                             }
                         }
@@ -460,7 +418,7 @@ fun AddBrandScreen(
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 8.dp, bottom = 16.dp)
+                                .padding(top = 12.dp, bottom = 16.dp)
                         ) { Text("Skip testing & save") }
                     }
                 }
@@ -552,12 +510,58 @@ fun AddBrandScreen(
                             shape = RoundedCornerShape(16.dp)
                         ) { Text("Save & open remote") }
                         TextButton(
-                            onClick = { step = AddStep.TestPower },
+                            onClick = {
+                                showRespondPrompt = testsTried > 0
+                                step = AddStep.TestPower
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Back to Power test") }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun BrandSelectCard(
+    brand: BrandPack,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1.05f)
+            .semantics { contentDescription = brand.name }
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            BrandLettermark(brandId = brand.id, brandName = brand.name, size = 56.dp)
+            Spacer(Modifier.height(12.dp))
+            Text(
+                brand.name,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (brand.id == "lg") "Documented IR" else "Sample IR",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
