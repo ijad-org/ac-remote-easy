@@ -40,6 +40,19 @@ object LgIrCodec {
 
     fun swingPattern(): IntArray = frameToPattern(SWING_V_SWING)
 
+    /**
+     * Light set of Power probe frames for pairing (Mi-style config cycle).
+     * Index 0 = Cool 24° Auto ON; then OFF; Cool 22; Heat 24; Fan Auto.
+     */
+    fun powerProbeVariants(): List<IntArray> = listOf(
+        patternFor(true, AcMode.Cool, 24, FanSpeed.Auto),
+        powerOffPattern(),
+        patternFor(true, AcMode.Cool, 22, FanSpeed.Auto),
+        patternFor(true, AcMode.Heat, 24, FanSpeed.Auto),
+        patternFor(true, AcMode.Fan, 18, FanSpeed.Auto)
+    )
+
+
     fun powerOffPattern(): IntArray = frameToPattern(OFF_FRAME)
 
     private fun encodeOn(mode: AcMode, temperatureC: Int, fan: FanSpeed): Int {
